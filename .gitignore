@@ -1,0 +1,19 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+pubspec.lock
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+
+# Logs
+*.log
