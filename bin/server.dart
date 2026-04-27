@@ -1,14 +1,28 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:app_auth_api/core/config/dotenv.dart';
 import 'package:app_auth_api/modules/auth/presentation/routes/auth_routes.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_cors_headers/shelf_cors_headers.dart';
 import 'package:shelf_router/shelf_router.dart';
 
+const _preflightHeaders = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'access-control-allow-headers': 'Origin, Content-Type, Authorization',
+};
+
 Future<void> main() async {
+  Env.load();
+
   final router = Router();
+
+  router.options(
+    '/<ignored|.*>',
+    (Request req) => Response.ok('', headers: _preflightHeaders),
+  );
 
   router.get('/', (Request req) {
     return Response.ok(
@@ -24,7 +38,7 @@ Future<void> main() async {
     );
   });
 
-  router.mount('/auth', authRoutes().call);
+  router.mount('/auth', authRoutes());
 
   final handler = Pipeline()
       .addMiddleware(logRequests())

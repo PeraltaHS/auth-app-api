@@ -1,24 +1,22 @@
+import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
-import '../../application/usecases/login_usecase.dart';
-import '../../application/usecases/register_usecase.dart';
-import '../../infra/repositories/auth_repository_memory.dart';
+import '../../../../core/middlewares/auth_middleware.dart';
 import '../controllers/auth_controller.dart';
 
 Router authRoutes() {
-  final repo = AuthRepositoryMemory();
-  final registerUsecase = RegisterUsecase(repo);
-  final loginUsecase = LoginUsecase(repo);
-
-  final controller = AuthController(
-    register: registerUsecase,
-    login: loginUsecase,
-  );
-
   final router = Router();
+  final controller = AuthController();
 
   router.post('/register', controller.register);
   router.post('/login', controller.login);
+
+  router.get(
+    '/me',
+    Pipeline()
+        .addMiddleware(authMiddleware())
+        .addHandler(controller.me),
+  );
 
   return router;
 }
