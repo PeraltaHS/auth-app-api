@@ -1,0 +1,105 @@
+services:
+  postgres_local:
+    image: postgres:15-alpine
+    container_name: gb_one_postgres_local
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-12345678}
+      POSTGRES_DB: ${POSTGRES_DB:-authapp}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-authapp}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gb_one_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: gb_one_redis
+    command:
+      [
+        "redis-server",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gb_one_network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    container_name: gb_one_backend
+    env_file:
+      - ./backend/.env
+    environment:
+      APP_PORT: ${APP_PORT:-8080}
+      DB_HOST: postgres_local
+      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_NAME: ${POSTGRES_DB:-authapp}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-12345678}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-12345678}@postgres_local:5432/${POSTGRES_DB:-authapp}
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_URL: redis://redis:${REDIS_PORT:-6379}/${REDIS_DB:-0}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ERP_DATABASE_URL: postgresql://${ERP_DB_USER:-postgres}:${ERP_DB_PASSWORD:-12345678}@${ERP_DATABASE_HOST:-host.docker.internal}:${ERP_DATABASE_PORT:-5432}/${ERP_DATABASE_NAME:-authapp}
+    ports:
+      - "${BACKEND_PORT:-3000}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres_local:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    networks:
+      - gb_one_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: gb_one_frontend
+    ports:
+      - "${FRONTEND_PORT:-3001}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - gb_one_network
+    restart: unless-stopped
+
+networks:
+  gb_one_network:
+    driver: bridge
